@@ -1,151 +1,86 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MEGA HELP — Scanner</title>
-
-  <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #071a33;
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 20px;
-    }
-
-    h1 {
-      margin-bottom: 5px;
-    }
-
-    p {
-      margin-top: 5px;
-    }
-
-    #reader {
-      width: 100%;
-      max-width: 500px;
-      margin: 20px auto;
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    #result {
-      max-width: 500px;
-      margin: 20px auto;
-      padding: 18px;
-      border-radius: 12px;
-      background: white;
-      color: #111;
-      font-size: 18px;
-      word-break: break-word;
-    }
-
-    .success {
-      color: green;
-      font-weight: bold;
-    }
-
-    .error {
-      color: red;
-      font-weight: bold;
-    }
-
-    button {
-      padding: 12px 20px;
-      margin: 8px;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#071a33">
+<title>MEGA HELP — Scanner</title>
+<script src="https://unpkg.com/@zxing/library@0.21.3"></script>
+<style>
+body{font-family:Arial,sans-serif;background:#071a33;color:white;text-align:center;margin:0;padding:20px}
+h1{margin-bottom:5px} p{margin-top:5px}
+#reader{width:100%;max-width:500px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden}
+video{width:100%!important;display:block;background:#000}
+#result{max-width:500px;margin:20px auto;padding:18px;border-radius:12px;background:white;color:#111;font-size:18px;word-break:break-word}
+.success{color:green;font-weight:bold}.error{color:red;font-weight:bold}
+.violet{color:#7b2cbf;font-weight:bold}.blue{color:#06c;font-weight:bold}
+.red{color:#d00000;font-weight:bold}.orange{color:#f57c00;font-weight:bold}
+button{padding:14px 22px;margin:8px;border:0;border-radius:8px;font-size:17px}
+#cameraSelect{display:none;max-width:500px;width:100%;padding:12px;border-radius:8px;margin:10px auto;font-size:16px}
+</style>
 </head>
-
 <body>
-
-  <h1>MEGA HELP</h1>
-  <p>Scanner des billets 100 ÉGAL 2026</p>
-
-  <div id="reader"></div>
-
-  <div id="result">
-    En attente d'un code-barres...
-  </div>
-
-  <button onclick="startScanner()">Démarrer le scanner</button>
-  <button onclick="stopScanner()">Arrêter</button>
-
+<h1>MEGA HELP</h1>
+<p>Scanner des billets 100 ÉGAL 2026</p>
+<select id="cameraSelect"></select>
+<div id="reader"></div>
+<div id="result">En attente d'un code-barres...</div>
+<button onclick="startScanner()">📷 Démarrer le scanner</button>
+<button onclick="stopScanner()">⏹ Arrêter</button>
 <script>
+let codeReader=null,scanning=false,cameras=[];
+const resultBox=document.getElementById("result"),cameraSelect=document.getElementById("cameraSelect");
 
-let codeReader = null;
-let scanning = false;
-
-function startScanner() {
-
-  if (scanning) return;
-
-  codeReader = new ZXing.BrowserMultiFormatReader();
-  scanning = true;
-
-  document.getElementById("result").innerHTML =
-    "📷 Recherche du code-barres...";
-
-  codeReader.decodeFromVideoDevice(
-    null,
-    "reader",
-    (result, error) => {
-
-      if (result) {
-
-        const code = result.getText().trim();
-
-        document.getElementById("result").innerHTML =
-          "<div class='success'>✅ CODE SCANNÉ</div>" +
-          "<br>" +
-          "<strong>" + escapeHtml(code) + "</strong>";
-
-        console.log("Code détecté :", code);
-
-        // Arrête automatiquement après une lecture
-        stopScanner();
-      }
-    }
-  ).catch(error => {
-
-    console.error(error);
-
-    document.getElementById("result").innerHTML =
-      "<div class='error'>❌ Impossible d'ouvrir la caméra.</div>" +
-      "<br>Vérifie l'autorisation de la caméra.";
-    
-    scanning = false;
+function getCategory(code){
+ const c=code.trim().toUpperCase();
+ if(!/^MH-\d{4}$/.test(c)) return null;
+ const n=parseInt(c.slice(3),10);
+ if(n>=1&&n<=2000)return{name:"VIOLET",css:"violet"};
+ if(n>=2001&&n<=3000)return{name:"BLEU",css:"blue"};
+ if(n>=3001&&n<=5000)return{name:"ROUGE",css:"red"};
+ if(n>=5001&&n<=6000)return{name:"ORANGE",css:"orange"};
+ return null;
+}
+function used(c){return localStorage.getItem("megahelp_used_"+c)==="1"}
+function mark(c){localStorage.setItem("megahelp_used_"+c,"1")}
+function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML}
+function showResult(code){
+ const cat=getCategory(code);
+ if(!cat){resultBox.innerHTML="<div class='error'>❌ CODE INCONNU</div><br><strong>"+esc(code)+"</strong><br><br>Ce code ne fait pas partie des 6 000 codes MEGA HELP.";return}
+ if(used(code)){resultBox.innerHTML="<div class='error'>⚠️ CODE DÉJÀ CONTRÔLÉ</div><br><strong>"+esc(code)+"</strong><br><br>Catégorie : <span class='"+cat.css+"'>"+cat.name+"</span>";return}
+ mark(code);
+ resultBox.innerHTML="<div class='success'>✅ CODE VALIDE</div><br><strong>"+esc(code)+"</strong><br><br>🎟️ Catégorie : <span class='"+cat.css+"'>"+cat.name+"</span><br><br>Billet accepté";
+}
+async function getCamera(){
+ const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
+ stream.getTracks().forEach(t=>t.stop());
+ cameras=await codeReader.listVideoInputDevices();
+ cameraSelect.innerHTML="";
+ cameras.forEach((c,i)=>{let o=document.createElement("option");o.value=c.deviceId;o.textContent=c.label||("Caméra "+(i+1));cameraSelect.appendChild(o)});
+ const rear=cameras.find(c=>/back|rear|environment|arrière|arriere/i.test(c.label));
+ if(rear)cameraSelect.value=rear.deviceId;
+ if(cameras.length>1)cameraSelect.style.display="block";
+ return cameraSelect.value||(cameras[0]&&cameras[0].deviceId);
+}
+async function startScanner(){
+ if(scanning)return;
+ if(!window.isSecureContext){resultBox.innerHTML="<div class='error'>❌ Caméra bloquée</div><br>Le scanner doit être ouvert avec HTTPS.";return}
+ try{
+  resultBox.innerHTML="📷 Demande d'autorisation de la caméra...";
+  codeReader=new ZXing.BrowserMultiFormatReader();
+  const id=await getCamera();
+  if(!id)throw new Error("Aucune caméra trouvée");
+  scanning=true;
+  resultBox.innerHTML="📷 Scanner actif... Présente un code-barres devant la caméra.";
+  codeReader.decodeFromVideoDevice(id,"reader",(result,error)=>{
+   if(result){showResult(result.getText().trim());stopScanner()}
   });
+ }catch(e){
+  console.error(e);scanning=false;
+  resultBox.innerHTML="<div class='error'>❌ Impossible d'ouvrir la caméra.</div><br>Autorise la caméra pour ce site. Si plusieurs caméras existent, sélectionne la caméra arrière.";
+ }
 }
-
-function stopScanner() {
-
-  if (codeReader) {
-    try {
-      codeReader.reset();
-    } catch(e) {}
-  }
-
-  scanning = false;
-}
-
-function escapeHtml(text) {
-
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
-
+function stopScanner(){if(codeReader){try{codeReader.reset()}catch(e){}}scanning=false}
 </script>
-
 </body>
 </html>
