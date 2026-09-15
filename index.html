@@ -1,352 +1,149 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MEGA HELP 100 ÉGAL 2026</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEGA HELP — Scanner</title>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
 
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f1f3f6;
-  margin: 0;
-  padding: 16px;
-}
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #071a33;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
 
-.card {
-  max-width: 520px;
-  margin: auto;
-  background: white;
-  padding: 22px;
-  border-radius: 20px;
-  box-shadow: 0 5px 20px rgba(0,0,0,.15);
-}
+    h1 {
+      margin-bottom: 5px;
+    }
 
-h1 {
-  text-align: center;
-  font-size: 23px;
-  margin: 5px 0 8px;
-}
+    p {
+      margin-top: 5px;
+    }
 
-.subtitle {
-  text-align: center;
-  color: #666;
-  font-size: 20px;
-  margin-bottom: 20px;
-}
+    #reader {
+      width: 100%;
+      max-width: 500px;
+      margin: 20px auto;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+    }
 
-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 16px;
-  font-size: 18px;
-  border: 2px solid #ccc;
-  border-radius: 10px;
-  margin-bottom: 10px;
-}
+    #result {
+      max-width: 500px;
+      margin: 20px auto;
+      padding: 18px;
+      border-radius: 12px;
+      background: white;
+      color: #111;
+      font-size: 18px;
+      word-break: break-word;
+    }
 
-button {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 17px;
-  margin-top: 10px;
-  font-size: 18px;
-  font-weight: bold;
-  border: 0;
-  border-radius: 10px;
-  background: #222;
-  color: white;
-  cursor: pointer;
-}
+    .success {
+      color: green;
+      font-weight: bold;
+    }
 
-#lecteur {
-  width: 100%;
-  margin-top: 15px;
-  display: none;
-}
+    .error {
+      color: red;
+      font-weight: bold;
+    }
 
-#detecte {
-  display: none;
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 10px;
-  background: #eef2f7;
-  text-align: center;
-  word-break: break-all;
-  font-size: 17px;
-}
-
-#resultat {
-  text-align: center;
-  font-size: 26px;
-  font-weight: bold;
-  margin-top: 22px;
-  min-height: 60px;
-}
-
-.vert { color: green; }
-.rouge { color: red; }
-.orange { color: #d28b00; }
-
-.small {
-  text-align: center;
-  color: #777;
-  font-size: 13px;
-  margin-top: 15px;
-}
-</style>
+    button {
+      padding: 12px 20px;
+      margin: 8px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="card">
+  <h1>MEGA HELP</h1>
+  <p>Scanner des billets 100 ÉGAL 2026</p>
 
-<h1>MEGA HELP 100 ÉGAL 2026</h1>
-<div class="subtitle">Contrôle des entrées</div>
+  <div id="reader"></div>
 
-<input id="poste" type="text" placeholder="Poste : Entrée 1">
+  <div id="result">
+    En attente d'un code-barres...
+  </div>
 
-<input id="code" type="text" autocomplete="off"
-       placeholder="Code du ticket">
-
-<button id="btnScan" onclick="ouvrirCamera()">
-📷 SCANNER AVEC LA CAMÉRA
-</button>
-
-<div id="lecteur"></div>
-
-<div id="detecte">
-  <strong>Code détecté :</strong>
-  <div id="codeDetecte"></div>
-</div>
-
-<button onclick="controlerCode()">
-✅ CONTRÔLER LE CODE
-</button>
-
-<div id="resultat"></div>
-
-<div class="small">
-Un code ne peut être utilisé qu'une seule fois.
-</div>
-
-</div>
+  <button onclick="startScanner()">Démarrer le scanner</button>
+  <button onclick="stopScanner()">Arrêter</button>
 
 <script>
 
-const API_URL = "https://script.google.com/macros/s/AKfycbxH4h_EQh7_d8T-IDgR8GKk1ryyGE5yh7PNlpAYTTqO1_6clqtPSjB2sroC6ks4p2W5/exec";
+let codeReader = null;
+let scanning = false;
 
-let lecteur = null;
-let cameraActive = false;
-let traitementEnCours = false;
+function startScanner() {
 
-function afficher(message, classe) {
-  const resultat = document.getElementById("resultat");
-  resultat.textContent = message;
-  resultat.className = classe || "";
-}
+  if (scanning) return;
 
-function ouvrirCamera() {
+  codeReader = new ZXing.BrowserMultiFormatReader();
+  scanning = true;
 
-  if (cameraActive) return;
+  document.getElementById("result").innerHTML =
+    "📷 Recherche du code-barres...";
 
-  const zone = document.getElementById("lecteur");
+  codeReader.decodeFromVideoDevice(
+    null,
+    "reader",
+    (result, error) => {
 
-  zone.style.display = "block";
+      if (result) {
 
-  document.getElementById("detecte").style.display = "none";
+        const code = result.getText().trim();
 
-  afficher("📷 Ouverture de la caméra...", "orange");
+        document.getElementById("result").innerHTML =
+          "<div class='success'>✅ CODE SCANNÉ</div>" +
+          "<br>" +
+          "<strong>" + escapeHtml(code) + "</strong>";
 
-  lecteur = new Html5Qrcode("lecteur");
+        console.log("Code détecté :", code);
 
-  lecteur.start(
-    { facingMode: "environment" },
-
-    {
-      fps: 10,
-      qrbox: { width: 320, height: 140 },
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.CODE_128
-      ]
-    },
-
-    function(codeLu) {
-
-      if (traitementEnCours) return;
-
-      // Affiche exactement ce que la caméra a lu.
-      document.getElementById("codeDetecte").textContent = codeLu;
-      document.getElementById("detecte").style.display = "block";
-
-      // Place le code lu dans le champ.
-      document.getElementById("code").value = codeLu;
-
-      // Arrête la caméra avant le contrôle.
-      fermerCamera();
-
-      // Petite pause pour laisser le temps de voir le code détecté.
-      setTimeout(function() {
-        controlerCode();
-      }, 500);
-    },
-
-    function(errorMessage) {
-      // Les erreurs de lecture intermédiaires sont normales.
-    }
-
-  ).then(function() {
-
-    cameraActive = true;
-
-    afficher("📷 Visez le code-barres", "orange");
-
-  }).catch(function(erreur) {
-
-    cameraActive = false;
-
-    zone.style.display = "none";
-
-    afficher(
-      "⚠️ Impossible d'ouvrir la caméra",
-      "rouge"
-    );
-
-    console.log(erreur);
-  });
-}
-
-function fermerCamera() {
-
-  if (!lecteur || !cameraActive) return;
-
-  lecteur.stop().then(function() {
-
-    lecteur.clear();
-
-    cameraActive = false;
-
-    document.getElementById("lecteur").style.display = "none";
-
-  }).catch(function(erreur) {
-
-    cameraActive = false;
-
-    document.getElementById("lecteur").style.display = "none";
-
-    console.log(erreur);
-  });
-}
-
-function controlerCode() {
-
-  if (traitementEnCours) return;
-
-  const code = document.getElementById("code").value.trim();
-
-  const poste =
-    document.getElementById("poste").value.trim()
-    || "Poste inconnu";
-
-  if (!code) {
-
-    afficher("⚠️ SCANNEZ UN CODE", "orange");
-
-    return;
-  }
-
-  traitementEnCours = true;
-
-  afficher("⏳ Vérification...", "orange");
-
-  const callbackName =
-    "megaHelpCallback_" +
-    Date.now() +
-    "_" +
-    Math.floor(Math.random() * 100000);
-
-  const script = document.createElement("script");
-
-  window[callbackName] = function(reponse) {
-
-    try {
-
-      if (reponse.statut === "VALIDE") {
-
-        afficher(
-          "🟢 ENTRÉE AUTORISÉE",
-          "vert"
-        );
-
-      } else if (reponse.statut === "UTILISE") {
-
-        afficher(
-          "🔴 DÉJÀ UTILISÉ",
-          "rouge"
-        );
-
-      } else if (reponse.statut === "INCONNU") {
-
-        afficher(
-          "🔴 CODE INCONNU",
-          "rouge"
-        );
-
-      } else {
-
-        afficher(
-          reponse.message || "⚠️ ERREUR",
-          "orange"
-        );
+        // Arrête automatiquement après une lecture
+        stopScanner();
       }
-
-    } finally {
-
-      traitementEnCours = false;
-
-      script.remove();
-
-      delete window[callbackName];
-
-      document.getElementById("code").focus();
     }
-  };
+  ).catch(error => {
 
-  script.onerror = function() {
+    console.error(error);
 
-    afficher(
-      "⚠️ ERREUR DE CONNEXION AU SERVEUR",
-      "rouge"
-    );
-
-    traitementEnCours = false;
-
-    script.remove();
-
-    delete window[callbackName];
-  };
-
-  script.src =
-    API_URL
-    + "?api=1"
-    + "&code=" + encodeURIComponent(code)
-    + "&poste=" + encodeURIComponent(poste)
-    + "&callback=" + encodeURIComponent(callbackName)
-    + "&t=" + Date.now();
-
-  document.body.appendChild(script);
+    document.getElementById("result").innerHTML =
+      "<div class='error'>❌ Impossible d'ouvrir la caméra.</div>" +
+      "<br>Vérifie l'autorisation de la caméra.";
+    
+    scanning = false;
+  });
 }
 
-document.getElementById("code").addEventListener(
-  "keydown",
-  function(event) {
-    if (event.key === "Enter") {
-      controlerCode();
-    }
+function stopScanner() {
+
+  if (codeReader) {
+    try {
+      codeReader.reset();
+    } catch(e) {}
   }
-);
+
+  scanning = false;
+}
+
+function escapeHtml(text) {
+
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
 
 </script>
 
