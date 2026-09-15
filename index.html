@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MEGA HELP — Scanner</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+body{font-family:Arial,sans-serif;background:#f1f3f6;margin:0;padding:16px}
+.card{max-width:520px;margin:auto;background:#fff;padding:20px;border-radius:20px;box-shadow:0 5px 20px #0002}
+h1{text-align:center;font-size:23px;margin:5px 0 8px}
+p{text-align:center;color:#666}
+input,button{width:100%;box-sizing:border-box;padding:16px;border-radius:10px;font-size:18px;margin-top:10px}
+input{border:2px solid #ccc}
+button{border:0;background:#222;color:#fff;font-weight:bold}
+#reader{margin-top:15px;display:none}
+#msg{text-align:center;font-size:21px;font-weight:bold;margin:18px 0;min-height:30px}
+.small{font-size:13px;color:#777}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>MEGA HELP 100 ÉGAL 2026</h1>
+<p>Scanner des tickets</p>
+<input id="poste" placeholder="Poste : Entrée 1">
+<button id="start" onclick="startScanner()">📷 SCANNER AVEC LA CAMÉRA</button>
+<div id="reader"></div>
+<div id="msg"></div>
+<p class="small">La caméra est utilisée uniquement sur cette page. Après lecture, le contrôle central est effectué par Google Apps Script.</p>
+</div>
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxH4h_EQh7_d8T-IDgR8GKk1ryyGE5yh7PNlpAYTTqO1_6clqtPSjB2sroC6ks4p2W5/exec";
+let scanner=null, active=false, sent=false;
+
+function startScanner(){
+  if(active) return;
+  document.getElementById("reader").style.display="block";
+  document.getElementById("msg").textContent="Autorisez la caméra puis visez le code-barres.";
+  scanner=new Html5Qrcode("reader");
+  scanner.start(
+    {facingMode:{exact:"environment"}},
+    {fps:10, qrbox:{width:300,height:130}, formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128]},
+    code=>{
+      if(sent) return;
+      sent=true;
+      const poste=document.getElementById("poste").value.trim()||"Poste inconnu";
+      scanner.stop().catch(()=>{});
+      active=false;
+      const url=APPS_SCRIPT_URL+"?action=check&code="+encodeURIComponent(code)+"&poste="+encodeURIComponent(poste);
+      window.location.href=url;
+    },
+    ()=>{}
+  ).then(()=>{active=true})
+  .catch(()=>{
+    document.getElementById("msg").textContent="⚠️ Caméra inaccessible. Vérifiez l'autorisation de caméra.";
+    document.getElementById("reader").style.display="none";
+    active=false;
+  });
+}
+</script>
+</body>
+</html>
