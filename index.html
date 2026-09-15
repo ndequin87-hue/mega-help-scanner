@@ -1,62 +1,150 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MEGA HELP — Scanner</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<title>MEGA HELP 100 ÉGAL 2026</title>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <style>
-body{font-family:Arial,sans-serif;background:#f1f3f6;margin:0;padding:16px}
-.card{max-width:520px;margin:auto;background:#fff;padding:20px;border-radius:20px;box-shadow:0 5px 20px #0002}
-h1{text-align:center;font-size:23px;margin:5px 0 8px}
-p{text-align:center;color:#666}
-input,button{width:100%;box-sizing:border-box;padding:16px;border-radius:10px;font-size:18px;margin-top:10px}
-input{border:2px solid #ccc}
-button{border:0;background:#222;color:#fff;font-weight:bold}
-#reader{margin-top:15px;display:none}
-#msg{text-align:center;font-size:21px;font-weight:bold;margin:18px 0;min-height:30px}
-.small{font-size:13px;color:#777}
+body{font-family:Arial,sans-serif;background:#f1f3f6;margin:0;padding:15px}
+.container{max-width:520px;margin:auto;background:#fff;padding:20px;border-radius:20px;box-shadow:0 5px 20px rgba(0,0,0,.15)}
+h1{text-align:center;font-size:22px}
+.subtitle{text-align:center;color:#666;margin-bottom:20px}
+input{width:100%;box-sizing:border-box;padding:15px;font-size:18px;border:2px solid #ccc;border-radius:10px;margin-bottom:10px}
+button{width:100%;padding:16px;margin-top:10px;font-size:18px;font-weight:bold;border:0;border-radius:10px;background:#222;color:#fff}
+#lecteur{width:100%;margin-top:15px;display:none}
+#resultat{text-align:center;font-size:26px;font-weight:bold;margin-top:25px;min-height:60px}
+.vert{color:green} .rouge{color:red} .orange{color:#d28b00}
+.petit{text-align:center;color:#666;font-size:14px;margin-top:15px}
 </style>
 </head>
 <body>
-<div class="card">
+<div class="container">
 <h1>MEGA HELP 100 ÉGAL 2026</h1>
-<p>Scanner des tickets</p>
-<input id="poste" placeholder="Poste : Entrée 1">
-<button id="start" onclick="startScanner()">📷 SCANNER AVEC LA CAMÉRA</button>
-<div id="reader"></div>
-<div id="msg"></div>
-<p class="small">La caméra est utilisée uniquement sur cette page. Après lecture, le contrôle central est effectué par Google Apps Script.</p>
-</div>
-<script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxH4h_EQh7_d8T-IDgR8GKk1ryyGE5yh7PNlpAYTTqO1_6clqtPSjB2sroC6ks4p2W5/exec";
-let scanner=null, active=false, sent=false;
+<div class="subtitle">Contrôle des entrées</div>
 
-function startScanner(){
-  if(active) return;
-  document.getElementById("reader").style.display="block";
-  document.getElementById("msg").textContent="Autorisez la caméra puis visez le code-barres.";
-  scanner=new Html5Qrcode("reader");
-  scanner.start(
-    {facingMode:{exact:"environment"}},
-    {fps:10, qrbox:{width:300,height:130}, formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128]},
-    code=>{
-      if(sent) return;
-      sent=true;
-      const poste=document.getElementById("poste").value.trim()||"Poste inconnu";
-      scanner.stop().catch(()=>{});
-      active=false;
-      const url=APPS_SCRIPT_URL+"?action=check&code="+encodeURIComponent(code)+"&poste="+encodeURIComponent(poste);
-      window.location.href=url;
+<input id="poste" type="text" placeholder="Poste : Entrée 1">
+<input id="code" type="text" autocomplete="off" placeholder="Code du ticket">
+
+<button id="btnScan" onclick="ouvrirCamera()">📷 SCANNER AVEC LA CAMÉRA</button>
+<div id="lecteur"></div>
+
+<button onclick="controlerCode()">✅ CONTRÔLER LE CODE</button>
+<div id="resultat"></div>
+
+<div class="petit">Un code ne peut être utilisé qu'une seule fois.</div>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbxH4h_EQh7_d8T-IDgR8GKk1ryyGE5yh7PNlpAYTTqO1_6clqtPSjB2sroC6ks4p2W5/exec";
+let lecteur = null;
+let cameraActive = false;
+let traitementEnCours = false;
+
+function afficher(message, classe) {
+  const r = document.getElementById("resultat");
+  r.textContent = message;
+  r.className = classe || "";
+}
+
+function ouvrirCamera() {
+  if (cameraActive) return;
+
+  const zone = document.getElementById("lecteur");
+  zone.style.display = "block";
+  afficher("📷 Ouverture de la caméra...", "orange");
+
+  lecteur = new Html5Qrcode("lecteur");
+
+  lecteur.start(
+    { facingMode: "environment" },
+    {
+      fps: 10,
+      qrbox: { width: 300, height: 120 },
+      formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128]
     },
-    ()=>{}
-  ).then(()=>{active=true})
-  .catch(()=>{
-    document.getElementById("msg").textContent="⚠️ Caméra inaccessible. Vérifiez l'autorisation de caméra.";
-    document.getElementById("reader").style.display="none";
-    active=false;
+    function(codeLu) {
+      if (traitementEnCours) return;
+      traitementEnCours = true;
+      document.getElementById("code").value = codeLu;
+      fermerCamera();
+      controlerCode();
+    },
+    function() {}
+  ).then(function() {
+    cameraActive = true;
+    afficher("📷 Visez le code-barres", "orange");
+  }).catch(function(err) {
+    cameraActive = false;
+    zone.style.display = "none";
+    afficher("⚠️ Impossible d'ouvrir la caméra. Vérifiez l'autorisation caméra.", "rouge");
+    console.log(err);
   });
 }
+
+function fermerCamera() {
+  if (!lecteur || !cameraActive) return;
+  lecteur.stop().then(function() {
+    lecteur.clear();
+    cameraActive = false;
+    document.getElementById("lecteur").style.display = "none";
+  }).catch(function(err) {
+    cameraActive = false;
+    console.log(err);
+  });
+}
+
+function controlerCode() {
+  const code = document.getElementById("code").value.trim();
+  const poste = document.getElementById("poste").value.trim() || "Poste inconnu";
+
+  if (!code) {
+    afficher("⚠️ SCANNEZ UN CODE", "orange");
+    traitementEnCours = false;
+    return;
+  }
+
+  afficher("⏳ Vérification...", "orange");
+
+  // JSONP : permet à cette page HTTPS externe de communiquer
+  // avec Apps Script sans utiliser google.script.run.
+  const callbackName = "megaHelpCallback_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+  const script = document.createElement("script");
+
+  window[callbackName] = function(reponse) {
+    try {
+      afficher(reponse.message || "Réponse reçue", 
+        reponse.statut === "VALIDE" ? "vert" :
+        (reponse.statut === "UTILISE" || reponse.statut === "INCONNU" ? "rouge" : "orange"));
+      document.getElementById("code").value = "";
+    } finally {
+      traitementEnCours = false;
+      script.remove();
+      delete window[callbackName];
+      document.getElementById("code").focus();
+    }
+  };
+
+  script.onerror = function() {
+    afficher("⚠️ ERREUR DE CONNEXION AU SERVEUR", "rouge");
+    traitementEnCours = false;
+    script.remove();
+    delete window[callbackName];
+  };
+
+  script.src = API_URL
+    + "?api=1"
+    + "&code=" + encodeURIComponent(code)
+    + "&poste=" + encodeURIComponent(poste)
+    + "&callback=" + encodeURIComponent(callbackName)
+    + "&t=" + Date.now();
+
+  document.body.appendChild(script);
+}
+
+document.getElementById("code").addEventListener("keydown", function(event) {
+  if (event.key === "Enter") controlerCode();
+});
 </script>
 </body>
 </html>
