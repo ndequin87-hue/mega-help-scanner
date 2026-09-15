@@ -2,85 +2,103 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#071a33">
-<title>MEGA HELP — Scanner</title>
+<title>MEGA HELP — Contrôle</title>
 <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
 <style>
-body{font-family:Arial,sans-serif;background:#071a33;color:white;text-align:center;margin:0;padding:20px}
-h1{margin-bottom:5px} p{margin-top:5px}
-#reader{width:100%;max-width:500px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden}
-video{width:100%!important;display:block;background:#000}
-#result{max-width:500px;margin:20px auto;padding:18px;border-radius:12px;background:white;color:#111;font-size:18px;word-break:break-word}
-.success{color:green;font-weight:bold}.error{color:red;font-weight:bold}
-.violet{color:#7b2cbf;font-weight:bold}.blue{color:#06c;font-weight:bold}
-.red{color:#d00000;font-weight:bold}.orange{color:#f57c00;font-weight:bold}
-button{padding:14px 22px;margin:8px;border:0;border-radius:8px;font-size:17px}
-#cameraSelect{display:none;max-width:500px;width:100%;padding:12px;border-radius:8px;margin:10px auto;font-size:16px}
+body{font-family:Arial,sans-serif;background:#071a33;color:#fff;text-align:center;margin:0;padding:18px}
+h1{margin:8px 0}p{margin:6px 0 14px}
+#reader{width:100%;max-width:520px;margin:15px auto;background:#000;border-radius:14px;overflow:hidden;min-height:280px}
+#video{width:100%;display:block;background:#000;min-height:280px;object-fit:cover}
+#result{max-width:520px;margin:16px auto;padding:18px;border-radius:12px;background:#fff;color:#111;font-size:19px;word-break:break-word}
+.success{color:green;font-weight:bold}.error{color:#d00000;font-weight:bold}
+.violet{color:#7b2cbf;font-weight:bold}.blue{color:#06c;font-weight:bold}.red{color:#d00000;font-weight:bold}.orange{color:#f57c00;font-weight:bold}
+button{padding:14px 20px;margin:7px;border:0;border-radius:9px;font-size:17px}
+#cameraSelect{display:none;width:100%;max-width:520px;padding:12px;border-radius:9px;margin:10px auto;font-size:16px}
 </style>
 </head>
 <body>
 <h1>MEGA HELP</h1>
-<p>Scanner des billets 100 ÉGAL 2026</p>
+<p>Contrôle des billets 100 ÉGAL 2026</p>
 <select id="cameraSelect"></select>
-<div id="reader"></div>
+<div id="reader"><video id="video" playsinline autoplay muted></video></div>
 <div id="result">En attente d'un code-barres...</div>
 <button onclick="startScanner()">📷 Démarrer le scanner</button>
 <button onclick="stopScanner()">⏹ Arrêter</button>
-<script>
-let codeReader=null,scanning=false,cameras=[];
-const resultBox=document.getElementById("result"),cameraSelect=document.getElementById("cameraSelect");
 
-function getCategory(code){
+<script>
+let reader=null,stream=null,scanning=false;
+const video=document.getElementById("video"), result=document.getElementById("result"), select=document.getElementById("cameraSelect");
+
+function category(code){
  const c=code.trim().toUpperCase();
- if(!/^MH-\d{4}$/.test(c)) return null;
- const n=parseInt(c.slice(3),10);
- if(n>=1&&n<=2000)return{name:"VIOLET",css:"violet"};
- if(n>=2001&&n<=3000)return{name:"BLEU",css:"blue"};
- if(n>=3001&&n<=5000)return{name:"ROUGE",css:"red"};
- if(n>=5001&&n<=6000)return{name:"ORANGE",css:"orange"};
+ if(!/^MH-\d{4}$/.test(c))return null;
+ const n=+c.slice(3);
+ if(n<=2000)return["VIOLET","violet"];
+ if(n<=3000)return["BLEU","blue"];
+ if(n<=5000)return["ROUGE","red"];
+ if(n<=6000)return["ORANGE","orange"];
  return null;
 }
-function used(c){return localStorage.getItem("megahelp_used_"+c)==="1"}
-function mark(c){localStorage.setItem("megahelp_used_"+c,"1")}
-function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML}
-function showResult(code){
- const cat=getCategory(code);
- if(!cat){resultBox.innerHTML="<div class='error'>❌ CODE INCONNU</div><br><strong>"+esc(code)+"</strong><br><br>Ce code ne fait pas partie des 6 000 codes MEGA HELP.";return}
- if(used(code)){resultBox.innerHTML="<div class='error'>⚠️ CODE DÉJÀ CONTRÔLÉ</div><br><strong>"+esc(code)+"</strong><br><br>Catégorie : <span class='"+cat.css+"'>"+cat.name+"</span>";return}
- mark(code);
- resultBox.innerHTML="<div class='success'>✅ CODE VALIDE</div><br><strong>"+esc(code)+"</strong><br><br>🎟️ Catégorie : <span class='"+cat.css+"'>"+cat.name+"</span><br><br>Billet accepté";
-}
-async function getCamera(){
- const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
- stream.getTracks().forEach(t=>t.stop());
- cameras=await codeReader.listVideoInputDevices();
- cameraSelect.innerHTML="";
- cameras.forEach((c,i)=>{let o=document.createElement("option");o.value=c.deviceId;o.textContent=c.label||("Caméra "+(i+1));cameraSelect.appendChild(o)});
- const rear=cameras.find(c=>/back|rear|environment|arrière|arriere/i.test(c.label));
- if(rear)cameraSelect.value=rear.deviceId;
- if(cameras.length>1)cameraSelect.style.display="block";
- return cameraSelect.value||(cameras[0]&&cameras[0].deviceId);
+function esc(t){let d=document.createElement("div");d.textContent=t;return d.innerHTML}
+function show(code){
+ const x=category(code);
+ if(!x){result.innerHTML="<div class=error>❌ CODE INCONNU</div><br><b>"+esc(code)+"</b><br><br>Ce code ne fait pas partie des 6 000 codes MEGA HELP.";return}
+ const key="megahelp_used_"+code;
+ if(localStorage.getItem(key)==="1"){
+  result.innerHTML="<div class=error>⚠️ CODE DÉJÀ CONTRÔLÉ</div><br><b>"+esc(code)+"</b><br><br>Catégorie : <span class="+x[1]+">"+x[0]+"</span>";
+  return
+ }
+ localStorage.setItem(key,"1");
+ result.innerHTML="<div class=success>✅ CODE VALIDE</div><br><b>"+esc(code)+"</b><br><br>🎟️ Catégorie : <span class="+x[1]+">"+x[0]+"</span><br><br>Billet accepté";
 }
 async function startScanner(){
  if(scanning)return;
- if(!window.isSecureContext){resultBox.innerHTML="<div class='error'>❌ Caméra bloquée</div><br>Le scanner doit être ouvert avec HTTPS.";return}
  try{
-  resultBox.innerHTML="📷 Demande d'autorisation de la caméra...";
-  codeReader=new ZXing.BrowserMultiFormatReader();
-  const id=await getCamera();
-  if(!id)throw new Error("Aucune caméra trouvée");
+  result.textContent="📷 Ouverture de la caméra...";
+  reader=new ZXing.BrowserMultiFormatReader();
+  let devices=await reader.listVideoInputDevices();
+  if(!devices.length){
+   // Force permission first, then list again
+   const s=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+   s.getTracks().forEach(t=>t.stop());
+   devices=await reader.listVideoInputDevices();
+  }
+  select.innerHTML="";
+  devices.forEach((d,i)=>{let o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Caméra "+(i+1));select.appendChild(o)});
+  let rear=devices.find(d=>/back|rear|environment|arrière|arriere/i.test(d.label));
+  const id=rear?rear.deviceId:devices[0].deviceId;
+  select.value=id;
+  select.style.display=devices.length>1?"block":"none";
+
+  stream=await navigator.mediaDevices.getUserMedia({
+   video:{deviceId:{exact:id},width:{ideal:1280},height:{ideal:720}},
+   audio:false
+  });
+  video.srcObject=stream;
+  await video.play();
   scanning=true;
-  resultBox.innerHTML="📷 Scanner actif... Présente un code-barres devant la caméra.";
-  codeReader.decodeFromVideoDevice(id,"reader",(result,error)=>{
-   if(result){showResult(result.getText().trim());stopScanner()}
+  result.textContent="📷 Scanner actif — place le code devant la caméra.";
+
+  reader.decodeFromVideoElementContinuously(video,(res,err)=>{
+   if(res){
+    const code=res.getText().trim();
+    show(code);
+    stopScanner();
+   }
   });
  }catch(e){
-  console.error(e);scanning=false;
-  resultBox.innerHTML="<div class='error'>❌ Impossible d'ouvrir la caméra.</div><br>Autorise la caméra pour ce site. Si plusieurs caméras existent, sélectionne la caméra arrière.";
+  console.error(e);
+  result.innerHTML="<div class=error>❌ La caméra ne s'ouvre pas.</div><br>Vérifie que la caméra est autorisée pour ce site.";
+  stopScanner();
  }
 }
-function stopScanner(){if(codeReader){try{codeReader.reset()}catch(e){}}scanning=false}
+function stopScanner(){
+ if(reader){try{reader.reset()}catch(e){}}
+ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+ video.srcObject=null;scanning=false;
+}
 </script>
 </body>
 </html>
